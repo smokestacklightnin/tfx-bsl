@@ -14,6 +14,7 @@
 """Package Setup script for TFX BSL."""
 
 import os
+from pathlib import Path
 import platform
 import shutil
 import subprocess
@@ -93,13 +94,25 @@ class _BazelBuildCommand(setuptools.Command):
         self._additional_build_options = ['--macos_minimum_os=10.14']
 
   def run(self):
+    # Build the public protos to make sure they are buildable.
     subprocess.check_call(
-        [self._bazel_cmd, 'run', '-c', 'opt'] + self._additional_build_options +
-        ['//tfx_bsl:move_generated_files'],
+        [self._bazel_cmd, 'build', '-c', 'opt']
+        + self._additional_build_options
+        + ['//tfx_bsl/public/proto:public_protos'],
         # Bazel should be invoked in a directory containing bazel WORKSPACE
         # file, which is the root directory.
         cwd=os.path.dirname(os.path.realpath(__file__)),
-        env=dict(os.environ, PYTHON_BIN_PATH=sys.executable))
+        env=dict(os.environ, PYTHON_BIN_PATH=sys.executable),
+    )
+    subprocess.check_call(
+        [self._bazel_cmd, 'run', '-c', 'opt']
+        + self._additional_build_options
+        + ['//tfx_bsl:move_generated_files'],
+        # Bazel should be invoked in a directory containing bazel WORKSPACE
+        # file, which is the root directory.
+        cwd=os.path.dirname(os.path.realpath(__file__)),
+        env=dict(os.environ, PYTHON_BIN_PATH=sys.executable),
+    )
 
 
 class _BinaryDistribution(Distribution):
@@ -189,6 +202,16 @@ setup(
             git_master='@git+https://github.com/tensorflow/serving@master',
         ),
     ],
+    extras_require = {
+        "docs" : [
+          req for req in Path("./requirements-docs.txt")
+          .expanduser()
+          .resolve()
+          .read_text()
+          .splitlines()
+          if req
+        ]
+    },
     python_requires='>=3.9,<4',
     packages=find_packages(),
     include_package_data=True,
